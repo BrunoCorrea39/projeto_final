@@ -12,18 +12,20 @@ import {
   RadioGroup,
   Radio,
   Progress,
+  Spinner, // Adicione Spinner
+  Alert, AlertIcon, // Adicione Alert
   useToast,
 } from '@chakra-ui/react';
+import { fetchQuestionsForSimulado, submitSimuladoAnswers } from '../api/mockapi'; // Importe as funções da API Mock
 
-// --- Custom Hook para Cronômetro (tempo decrescente) ---
+// --- Custom Hook para Cronômetro (o mesmo que já está aí) ---
 function useCountdown(initialTimeInMinutes, onComplete) {
-  const [timeLeft, setTimeLeft] = useState(initialTimeInMinutes * 60); // Tempo em segundos
+  const [timeLeft, setTimeLeft] = useState(initialTimeInMinutes * 60);
   const intervalRef = useRef(null);
   const toast = useToast();
 
   useEffect(() => {
-    // Inicia o cronômetro apenas uma vez
-    if (intervalRef.current === null && timeLeft > 0) { // Garante que não inicia se já 0
+    if (intervalRef.current === null && timeLeft > 0) {
       intervalRef.current = setInterval(() => {
         setTimeLeft((prevTime) => {
           if (prevTime <= 1) {
@@ -65,48 +67,47 @@ function useCountdown(initialTimeInMinutes, onComplete) {
   };
 }
 
-// --- Dados Mockados de Questões (REUTILIZE AS SUAS QUESTÕES ATUAIS) ---
-const mockQuestions = [
-  {
-    id: 1,
-    text: "QUESTÃO 1: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-    options: ["Alternativa 1", "Alternativa 2", "Alternativa 3", "Alternativa 4", "Alternativa 5"],
-    correctAnswer: "Alternativa 3",
-  },
-  {
-    id: 2,
-    text: "QUESTÃO 2: Qual é a capital do Brasil? a) Buenos Aires b) Brasília c) Madri d) Paris e) Lisboa",
-    options: ["Buenos Aires", "Brasília", "Madri", "Paris", "Lisboa"],
-    correctAnswer: "Brasília",
-  },
-  {
-    id: 3,
-    text: "QUESTÃO 3: Quanto é 7 multiplicado por 8? a) 49 b) 54 c) 56 d) 63 e) 72",
-    options: ["49", "54", "56", "63", "72"],
-    correctAnswer: "56",
-  },
-  {
-    id: 4,
-    text: "QUESTÃO 4: Quem escreveu 'Dom Quixote'? a) William Shakespeare b) Miguel de Cervantes c) Johann Wolfgang von Goethe d) Leo Tolstoy e) Charles Dickens",
-    options: ["William Shakespeare", "Miguel de Cervantes", "Johann Wolfgang von Goethe", "Leo Tolstoy", "Charles Dickens"],
-    correctAnswer: "Miguel de Cervantes",
-  },
-  {
-    id: 5,
-    text: "QUESTÃO 5: Qual elemento químico tem o símbolo 'O'? a) Ouro b) Oxigênio c) Osmio d) Ósmio e) Óxido",
-    options: ["Ouro", "Oxigênio", "Osmio", "Ósmio", "Óxido"],
-    correctAnswer: "Oxigênio",
-  },
-];
-
-// Recebe o título do simulado e o tempo da prova, e a função para finalizar
-function QuestionPage({ simuladoTitle = "Simulado Padrão", totalSimuladoTimeInMinutes, onFinishSimulado }) {
+// O componente agora recebe o simuladoId também
+function QuestionPage({ simuladoTitle, totalSimuladoTimeInMinutes, simuladoId, onFinishSimulado }) {
+  const [questions, setQuestions] = useState([]); // Estado para as questões vindas da API
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState({}); // { questionId: "resposta" }
+  const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(true); // Novo estado de loading
+  const [errorQuestions, setErrorQuestions] = useState(null); // Novo estado de erro
+  const toast = useToast();
+
+  // Carrega as questões da API Mock ao montar o componente
+  useEffect(() => {
+    const loadQuestions = async () => {
+      setIsLoadingQuestions(true);
+      setErrorQuestions(null);
+      try {
+        const result = await fetchQuestionsForSimulado(simuladoId); // Chama a API Mock
+        if (result.success) {
+          setQuestions(result.data.questions);
+          // Opcional: Você pode querer salvar o simulado completo retornado pela API aqui também
+        } else {
+          setErrorQuestions(result.message || "Falha ao carregar questões.");
+        }
+      } catch (err) {
+        setErrorQuestions("Erro de rede ao carregar questões.");
+        console.error("Erro ao carregar questões:", err);
+      } finally {
+        setIsLoadingQuestions(false);
+      }
+    };
+
+    if (simuladoId) {
+      loadQuestions();
+    }
+  }, [simuladoId]); // Recarrega questões se o ID do simulado mudar
+
+
+  // Apenas inicia o cronômetro se as questões estiverem carregadas
   const { timeLeft, rawTimeLeft, totalTime } = useCountdown(totalSimuladoTimeInMinutes, () => handleFinishSimulado(true));
 
-  const currentQuestion = mockQuestions[currentQuestionIndex];
-  const toast = useToast();
+  const currentQuestion = questions[currentQuestionIndex];
+
 
   const handleAnswerChange = (value) => {
     setSelectedAnswers({
@@ -121,60 +122,82 @@ function QuestionPage({ simuladoTitle = "Simulado Padrão", totalSimuladoTimeInM
 
   const handleGiveUp = () => {
     if (window.confirm("Você tem certeza que deseja desistir do simulado? Seu progresso não será salvo.")) {
-      handleFinishSimulado(false);
+      // Quando desiste, podemos enviar respostas vazias ou parciais para registro se necessário
+      handleFinishSimulado(false, true); // Passa true para isGivingUp
     }
   };
 
-  const handleFinishSimulado = (timeUp = false) => {
-    if (timeUp || window.confirm("Você tem certeza que deseja finalizar o simulado?")) {
-      // --- Lógica para calcular acertos e salvar no histórico ---
-      let correctCount = 0;
-      mockQuestions.forEach(q => {
-        if (selectedAnswers[q.id] === q.correctAnswer) {
-          correctCount++;
+  const handleFinishSimulado = async (timeUp = false, isGivingUp = false) => { // Tornar async
+    if (timeUp || isGivingUp || window.confirm("Você tem certeza que deseja finalizar o simulado?")) {
+      // --- Envia respostas para a API Mock e processa o resultado ---
+      const submitResult = await submitSimuladoAnswers(simuladoId, selectedAnswers); // Chama a API Mock
+
+      if (submitResult.success) {
+        const { correctCount, totalQuestions, score } = submitResult.data;
+
+        const historyEntry = {
+          id: Date.now(),
+          title: simuladoTitle,
+          date: new Date().toLocaleDateString(),
+          score: score,
+          correctCount: correctCount,
+          totalQuestions: totalQuestions,
+          timeTaken: totalSimuladoTimeInMinutes * 60 - rawTimeLeft,
+          completed: !isGivingUp && !timeUp, // Se foi finalizado pelo usuário e não por tempo/desistência
+        };
+
+        // Carrega histórico existente, adiciona o novo e salva (mantendo local storage por enquanto)
+        const existingHistory = JSON.parse(localStorage.getItem('simuladoHistory') || '[]');
+        localStorage.setItem('simuladoHistory', JSON.stringify([...existingHistory, historyEntry]));
+
+        toast({
+          title: "Simulado Finalizado!",
+          description: `Você acertou ${score} questões.`,
+          status: "success",
+          duration: 5000,
+          isClosable: true,
+        });
+
+        if (onFinishSimulado) {
+          onFinishSimulado(historyEntry);
         }
-      });
-
-      const totalQuestions = mockQuestions.length;
-      const score = `${correctCount}/${totalQuestions}`; // Ex: "3/5"
-
-      const historyEntry = {
-        id: Date.now(), // ID único para o registro
-        title: simuladoTitle, // Título do simulado
-        date: new Date().toLocaleDateString(), // Data de hoje
-        score: score, // Quantidade de acertos
-        correctCount: correctCount,
-        totalQuestions: totalQuestions,
-        timeTaken: totalSimuladoTimeInMinutes * 60 - rawTimeLeft, // Tempo gasto
-        completed: !timeUp, // Se foi finalizado ou desistido/tempo esgotado
-      };
-
-      // Carrega histórico existente, adiciona o novo e salva
-      const existingHistory = JSON.parse(localStorage.getItem('simuladoHistory') || '[]');
-      localStorage.setItem('simuladoHistory', JSON.stringify([...existingHistory, historyEntry]));
-
-      toast({
-        title: "Simulado Finalizado!",
-        description: `Você acertou ${score} questões.`,
-        status: "success",
-        duration: 5000,
-        isClosable: true,
-      });
-
-      // Chama a função onFinishSimulado para retornar à tela de seleção
-      if (onFinishSimulado) {
-        onFinishSimulado(historyEntry); // Passa o resultado para o App.jsx
       } else {
-        window.location.reload();
+        toast({
+          title: "Erro ao Finalizar",
+          description: submitResult.message || "Não foi possível processar suas respostas.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
       }
     }
   };
 
 
-  if (!currentQuestion) {
+  if (isLoadingQuestions) { // Exibe loading enquanto as questões carregam
     return (
       <Flex justify="center" align="center" minH="100vh">
-        <Text fontSize="xl" color="gray.500">Nenhuma questão encontrada.</Text>
+        <Spinner size="xl" color="blue.500" mr={4} />
+        <Text fontSize="xl" color="gray.500">Carregando questões...</Text>
+      </Flex>
+    );
+  }
+
+  if (errorQuestions) { // Exibe erro se não conseguir carregar as questões
+    return (
+      <Flex justify="center" align="center" minH="100vh">
+        <Alert status="error">
+          <AlertIcon />
+          Erro: {errorQuestions}
+        </Alert>
+      </Flex>
+    );
+  }
+
+  if (!currentQuestion || questions.length === 0) { // Se não houver questões após o carregamento
+    return (
+      <Flex justify="center" align="center" minH="100vh">
+        <Text fontSize="xl" color="gray.500">Nenhuma questão encontrada para este simulado.</Text>
       </Flex>
     );
   }
@@ -195,9 +218,9 @@ function QuestionPage({ simuladoTitle = "Simulado Padrão", totalSimuladoTimeInM
       >
         <Heading size="md" mb={6} textTransform="uppercase">Questões</Heading>
         <VStack align="start" spacing={2} overflowY="auto" maxH="calc(100vh - 120px)">
-          {mockQuestions.map((_, index) => (
+          {questions.map((q, index) => ( // Mapeia as questões carregadas da API
             <Text
-              key={index}
+              key={q.id} // Usa o ID da questão como key
               cursor="pointer"
               fontWeight={currentQuestionIndex === index ? "bold" : "normal"}
               color={currentQuestionIndex === index ? "blue.300" : "white"}

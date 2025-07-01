@@ -1,6 +1,6 @@
 // src/SimuladoSelectionPage.jsx
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react'; // Adicione useEffect
 import {
   Box,
   Flex,
@@ -15,109 +15,54 @@ import {
   SimpleGrid,
   Divider,
   Image,
+  Spinner, // Adicione Spinner para o estado de loading
+  Alert, AlertIcon, // Adicione Alert para mensagens de erro
 } from '@chakra-ui/react';
+import { fetchSimulados } from '../api/mockapi'; // Importe a função da API Mock
 
-// --- Dados Mockados (USE A VERSÃO ATUALIZADA DO PASSO ANTERIOR) ---
-const mockSimulados = [
-  {
-    id: 1,
-    title: 'Prova Enem 2018',
-    image: 'https://via.placeholder.com/200x250/FF0000/FFFFFF?text=ENEM+2018',
-    subject: 'Matemática',
-    duration: '4h30min',
-    timeInMinutes: 270,
-    institution: 'ENEM',
-    disciplines: ['Matemática', 'Ciências da Natureza', 'Ciências Humanas', 'Linguagens'],
-    difficulty: 'Médio',
-  },
-  {
-    id: 2,
-    title: 'Prova Enem 2019',
-    image: 'https://via.placeholder.com/200x250/00FF00/FFFFFF?text=ENEM+2019',
-    subject: 'Português',
-    duration: '4h30min',
-    timeInMinutes: 270,
-    institution: 'ENEM',
-    disciplines: ['Português', 'Linguagens', 'Ciências Humanas'],
-    difficulty: 'Médio',
-  },
-  {
-    id: 3,
-    title: 'Prova Enem 2020',
-    image: 'https://via.placeholder.com/200x250/0000FF/FFFFFF?text=ENEM+2020',
-    subject: 'Física',
-    duration: '4h30min',
-    timeInMinutes: 270,
-    institution: 'ENEM',
-    disciplines: ['Física', 'Ciências da Natureza'],
-    difficulty: 'Difícil',
-  },
-  {
-    id: 4,
-    title: 'Vestibular Fuvest 2023',
-    image: 'https://via.placeholder.com/200x250/800080/FFFFFF?text=FUVEST+2023',
-    subject: 'História',
-    duration: '5h',
-    timeInMinutes: 300,
-    institution: 'USP (Fuvest)',
-    disciplines: ['História', 'Geografia', 'Português'],
-    difficulty: 'Difícil',
-  },
-  {
-    id: 5,
-    title: 'Vestibular Unicamp 2022',
-    image: 'https://via.placeholder.com/200x250/FFA500/FFFFFF?text=UNICAMP+2022',
-    subject: 'Química',
-    duration: '4h',
-    timeInMinutes: 240,
-    institution: 'UNICAMP',
-    disciplines: ['Química', 'Biologia', 'Matemática'],
-    difficulty: 'Médio',
-  },
-  {
-    id: 6,
-    title: 'Vestibular UFPR 2024',
-    image: 'https://via.placeholder.com/200x250/008000/FFFFFF?text=UFPR+2024',
-    subject: 'Biologia',
-    duration: '3h',
-    timeInMinutes: 180,
-    institution: 'UFPR',
-    disciplines: ['Biologia', 'Geografia', 'Inglês'],
-    difficulty: 'Fácil',
-  },
-  {
-    id: 7,
-    title: 'Simulado de Português Básico',
-    image: 'https://via.placeholder.com/200x250/C0C0C0/000000?text=Portugu%C3%AAs',
-    subject: 'Português',
-    duration: '1h',
-    timeInMinutes: 60,
-    institution: 'Geral',
-    disciplines: ['Português'],
-    difficulty: 'Fácil',
-  },
-  {
-    id: 8,
-    title: 'Desafio de Matemática Avançada',
-    image: 'https://via.placeholder.com/200x250/4B0082/FFFFFF?text=Matem%C3%A1tica',
-    subject: 'Matemática',
-    duration: '2h',
-    timeInMinutes: 120,
-    institution: 'Geral',
-    disciplines: ['Matemática'],
-    difficulty: 'Difícil',
-  },
-];
-
-// Agora recebe as props para iniciar simulado, mostrar histórico e logout
 function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
   const userName = "Fulano Beltrano";
 
+  const [simulados, setSimulados] = useState([]); // Estado para os simulados vindos da API
+  const [isLoading, setIsLoading] = useState(true); // Estado de loading
+  const [error, setError] = useState(null); // Estado para erros
+
+  // Estados para os filtros
   const [selectedInstitution, setSelectedInstitution] = useState('');
   const [selectedDiscipline, setSelectedDiscipline] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
+
+  // useEffect para carregar os simulados da API Mock ao montar o componente
+  useEffect(() => {
+    const loadSimulados = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await fetchSimulados({
+          searchTerm,
+          institution: selectedInstitution,
+          discipline: selectedDiscipline,
+          difficulty: selectedDifficulty,
+        });
+        if (result.success) {
+          setSimulados(result.data);
+        } else {
+          setError(result.message || "Falha ao carregar simulados.");
+        }
+      } catch (err) {
+        setError("Erro de rede ao carregar simulados.");
+        console.error("Erro ao carregar simulados:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSimulados();
+  }, [searchTerm, selectedInstitution, selectedDiscipline, selectedDifficulty]); // Recarrega quando filtros mudam
+
+  // Funções para lidar com a seleção dos filtros (iguais, mas agora acionam o useEffect)
   const handleInstitutionClick = (institution) => {
     setSelectedInstitution(prev => prev === institution ? '' : institution);
   };
@@ -127,45 +72,27 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
   const handleDifficultyClick = (difficulty) => {
     setSelectedDifficulty(prev => prev === difficulty ? '' : difficulty);
   };
+  const handleSearchChange = (e) => { // Novo handler para a busca
+    setSearchTerm(e.target.value);
+  };
 
+
+  // Obter listas únicas de disciplinas, instituições e dificuldades
+  // Agora baseadas nos 'simulados' carregados da API, não nos mockSimuladosData
   const uniqueDisciplines = useMemo(() => {
     const allDisciplines = new Set();
-    mockSimulados.forEach(simulado => {
+    simulados.forEach(simulado => {
       simulado.disciplines.forEach(d => allDisciplines.add(d));
     });
     return Array.from(allDisciplines).sort();
-  }, []);
+  }, [simulados]);
 
   const uniqueInstitutions = useMemo(() => {
-    const allInstitutions = new Set(mockSimulados.map(s => s.institution));
+    const allInstitutions = new Set(simulados.map(s => s.institution));
     return Array.from(allInstitutions).sort();
-  }, []);
+  }, [simulados]);
 
   const uniqueDifficulties = ['Fácil', 'Médio', 'Difícil'];
-
-  const filteredSimulados = useMemo(() => {
-    return mockSimulados.filter(simulado => {
-      const matchesSearch = searchTerm
-        ? simulado.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          simulado.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          simulado.institution.toLowerCase().includes(searchTerm.toLowerCase())
-        : true;
-
-      const matchesInstitution = selectedInstitution
-        ? simulado.institution === selectedInstitution
-        : true;
-
-      const matchesDiscipline = selectedDiscipline
-        ? simulado.disciplines.includes(selectedDiscipline)
-        : true;
-
-      const matchesDifficulty = selectedDifficulty
-        ? simulado.difficulty === selectedDifficulty
-        : true;
-
-      return matchesSearch && matchesInstitution && matchesDiscipline && matchesDifficulty;
-    });
-  }, [searchTerm, selectedInstitution, selectedDiscipline, selectedDifficulty]);
 
 
   return (
@@ -211,6 +138,7 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
 
           <Divider borderColor="gray.600" />
 
+
           {/* Seção de Disciplinas */}
           <Box>
             <Heading size="sm" mb={2} textTransform="uppercase">Disciplinas</Heading>
@@ -253,16 +181,16 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
 
           <Divider borderColor="gray.600" />
 
-          {/* Botão Histórico (agora com onClick) */}
-          <Button variant="ghost" colorScheme="blue" justifyContent="flex-start" _hover={{ bg: 'blue.700' }} onClick={onShowHistory}> {/* Adicionado onClick */}
+          {/* Botão Histórico */}
+          <Button variant="ghost" colorScheme="blue" justifyContent="flex-start" _hover={{ bg: 'blue.700' }} onClick={onShowHistory}>
             HISTÓRICO
           </Button>
         </VStack>
 
         <Spacer />
 
-        {/* Botão Sair (agora com onClick) */}
-        <Button colorScheme="red" mt={8} onClick={onLogout}> {/* Adicionado onClick */}
+        {/* Botão Sair */}
+        <Button colorScheme="red" mt={8} onClick={onLogout}>
           SAIR
         </Button>
       </Box>
@@ -277,21 +205,30 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
             color="gray.800"
             _placeholder={{ color: 'gray.500' }}
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearchChange} // Usa o novo handler
           />
-          <Button colorScheme="blue" bg="blue.600" _hover={{ bg: 'blue.700' }} onClick={() => {}}>BUSCAR</Button>
         </HStack>
 
-        {/* Grade de Cards de Simulado */}
-        {filteredSimulados.length > 0 ? (
+        {error && ( // Exibe mensagem de erro se houver
+          <Alert status="error" mb={4}>
+            <AlertIcon />
+            {error}
+          </Alert>
+        )}
+
+        {isLoading ? ( // Exibe spinner enquanto carrega
+          <Flex justify="center" align="center" h="200px">
+            <Spinner size="xl" color="white" />
+          </Flex>
+        ) : simulados.length > 0 ? (
           <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={8}>
-            {filteredSimulados.map(simulado => (
+            {simulados.map(simulado => (
               <Box key={simulado.id} bg="white" p={4} borderRadius="lg" boxShadow="md" color="gray.800">
                 <VStack spacing={3} align="center">
                   <Image src={simulado.image} alt={simulado.title} boxSize="150px" objectFit="contain" mb={2} />
                   <Heading size="md" textAlign="center">{simulado.title}</Heading>
                   <VStack align="flex-start" spacing={1} fontSize="sm">
-                    <Text>• Prova {simulado.title.split(' ')[2]}</Text>
+                    <Text>• Prova {simulado.title.includes('Enem') ? simulado.title.split(' ')[2] : ''}</Text> {/* Adapta para ENEM */}
                     <Text>• {simulado.subject}</Text>
                     <Text>• {simulado.duration}</Text>
                     <Text>• Instituição: {simulado.institution}</Text>
@@ -301,7 +238,7 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
                     colorScheme="blue"
                     mt={4}
                     width="full"
-                    onClick={() => onStartSimulado(simulado.title, simulado.timeInMinutes)} // Passa o título e tempo
+                    onClick={() => onStartSimulado(simulado.title, simulado.timeInMinutes, simulado.id)} // Adiciona simulado.id
                   >
                     INICIAR
                   </Button>
