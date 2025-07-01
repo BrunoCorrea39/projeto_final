@@ -1,6 +1,6 @@
-// src/SimuladoSelectionPage.jsx
+// src/components/SimuladoSelectionPage.jsx
 
-import React, { useState, useEffect, useMemo } from 'react'; // Adicione useEffect
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Flex,
@@ -14,32 +14,70 @@ import {
   Spacer,
   SimpleGrid,
   Divider,
-  Image,
-  Spinner, // Adicione Spinner para o estado de loading
-  Alert, AlertIcon, // Adicione Alert para mensagens de erro
+  // Removido: Image (não é mais importado se não for usado)
+  Spinner,
+  Alert, AlertIcon,
 } from '@chakra-ui/react';
-import { fetchSimulados } from '../api/mockapi'; // Importe a função da API Mock
+import axios from 'axios';
+import { fetchSimulados } from '../api/mockApi';
 
-function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
-  const userName = "Fulano Beltrano";
+const SIMULADOS_API_URL = 'http://127.0.0.1:8000/simulados';
 
-  const [simulados, setSimulados] = useState([]); // Estado para os simulados vindos da API
-  const [isLoading, setIsLoading] = useState(true); // Estado de loading
-  const [error, setError] = useState(null); // Estado para erros
+function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout, userName }) {
+  const [simulados, setSimulados] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Estados para os filtros
   const [selectedInstitution, setSelectedInstitution] = useState('');
   const [selectedDiscipline, setSelectedDiscipline] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // --- NOVA FUNÇÃO: Para obter a parte do nome antes do @ ---
+  const getDisplayName = (email) => {
+    if (!email || typeof email !== 'string') return 'Usuário';
+    return email.split('@')[0];
+  };
 
-  // useEffect para carregar os simulados da API Mock ao montar o componente
+  const displayName = getDisplayName(userName); // Usa a nova função para o nome de exibição
+
   useEffect(() => {
     const loadSimulados = async () => {
       setIsLoading(true);
       setError(null);
       try {
+        const userToken = localStorage.getItem('userToken');
+        if (!userToken) {
+          setError("Token de autenticação não encontrado. Faça login novamente.");
+          setIsLoading(false);
+          onLogout();
+          return;
+        }
+
+        const queryParams = new URLSearchParams();
+        if (searchTerm) queryParams.append('search_term', searchTerm);
+        if (selectedInstitution) queryParams.append('institution', selectedInstitution);
+        if (selectedDiscipline) queryParams.append('discipline', selectedDiscipline);
+        if (selectedDifficulty) queryParams.append('difficulty', selectedDifficulty);
+
+        const url = `${SIMULADOS_API_URL}?${queryParams.toString()}`;
+
+        // Substitua por chamada Axios real quando a API estiver pronta
+        // const response = await axios.get(url, { headers: { 'Authorization': userToken } });
+        // const apiSimulados = response.data;
+        // const mappedSimulados = apiSimulados.map(s => ({
+        //   id: s.id,
+        //   title: s.titulo,
+        //   subject: s.disciplinas && s.disciplinas.length > 0 ? s.disciplinas[0] : 'Geral',
+        //   duration: `${Math.floor(s.tempo_em_minutos / 60)}h${s.tempo_em_minutos % 60}min`,
+        //   timeInMinutes: s.tempo_em_minutos,
+        //   institution: s.instituicao,
+        //   disciplines: s.disciplinas,
+        //   difficulty: s.dificuldade,
+        // }));
+        // setSimulados(mappedSimulados);
+
+        // Por enquanto, continua usando a mockApi sem imagem
         const result = await fetchSimulados({
           searchTerm,
           institution: selectedInstitution,
@@ -47,22 +85,42 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
           difficulty: selectedDifficulty,
         });
         if (result.success) {
-          setSimulados(result.data);
+            setSimulados(result.data.map(s => {
+                const { image, ...rest } = s;
+                return rest;
+            }));
         } else {
-          setError(result.message || "Falha ao carregar simulados.");
+          setError(result.message || "Falha ao carregar simulados (API Mock).");
         }
+
+
       } catch (err) {
-        setError("Erro de rede ao carregar simulados.");
+        let errorMessage = "Erro ao carregar simulados.";
+        if (err.response) {
+          errorMessage = err.response.data.detail || err.response.data.message || errorMessage;
+          if (err.response.status === 401) {
+            errorMessage = "Sessão expirada ou não autorizada. Faça login novamente.";
+            onLogout();
+          }
+        } else if (err.request) {
+          errorMessage = "Nenhuma resposta do servidor de simulados.";
+        }
+        setError(errorMessage);
         console.error("Erro ao carregar simulados:", err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadSimulados();
-  }, [searchTerm, selectedInstitution, selectedDiscipline, selectedDifficulty]); // Recarrega quando filtros mudam
+    if (localStorage.getItem('userToken')) {
+      loadSimulados();
+    } else {
+      setIsLoading(false);
+      setError("Faça login para ver os simulados.");
+    }
+  }, [searchTerm, selectedInstitution, selectedDiscipline, selectedDifficulty, onLogout]);
 
-  // Funções para lidar com a seleção dos filtros (iguais, mas agora acionam o useEffect)
+
   const handleInstitutionClick = (institution) => {
     setSelectedInstitution(prev => prev === institution ? '' : institution);
   };
@@ -72,17 +130,16 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
   const handleDifficultyClick = (difficulty) => {
     setSelectedDifficulty(prev => prev === difficulty ? '' : difficulty);
   };
-  const handleSearchChange = (e) => { // Novo handler para a busca
+  const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
   };
 
-
-  // Obter listas únicas de disciplinas, instituições e dificuldades
-  // Agora baseadas nos 'simulados' carregados da API, não nos mockSimuladosData
   const uniqueDisciplines = useMemo(() => {
     const allDisciplines = new Set();
     simulados.forEach(simulado => {
-      simulado.disciplines.forEach(d => allDisciplines.add(d));
+      if (simulado.disciplines && Array.isArray(simulado.disciplines)) {
+        simulado.disciplines.forEach(d => allDisciplines.add(d));
+      }
     });
     return Array.from(allDisciplines).sort();
   }, [simulados]);
@@ -111,11 +168,14 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
         <VStack spacing={6} align="stretch">
           {/* Avatar e Nome do Usuário */}
           <HStack spacing={3} mb={4}>
-            <Avatar size="md" name={userName} src="https://via.placeholder.com/50" />
-            <Text fontSize="lg" fontWeight="bold">{userName}</Text>
+            {/* Usa displayName para o nome e para o gerador de avatar */}
+            <Avatar size="md" name={displayName} src={`https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&color=fff&size=50`} />
+            <Text fontSize="lg" fontWeight="bold">{displayName}</Text> {/* Usa displayName aqui */}
           </HStack>
 
           <Divider borderColor="gray.600" />
+
+          {/* ... restante da sidebar (filtros, histórico, sair) ... */}
 
           {/* Seção de Instituições */}
           <Box>
@@ -205,18 +265,19 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
             color="gray.800"
             _placeholder={{ color: 'gray.500' }}
             value={searchTerm}
-            onChange={handleSearchChange} // Usa o novo handler
+            onChange={handleSearchChange}
           />
+          <Button colorScheme="blue" bg="blue.600" _hover={{ bg: 'blue.700' }} onClick={() => {}}>BUSCAR</Button>
         </HStack>
 
-        {error && ( // Exibe mensagem de erro se houver
+        {error && (
           <Alert status="error" mb={4}>
             <AlertIcon />
             {error}
           </Alert>
         )}
 
-        {isLoading ? ( // Exibe spinner enquanto carrega
+        {isLoading ? (
           <Flex justify="center" align="center" h="200px">
             <Spinner size="xl" color="white" />
           </Flex>
@@ -225,10 +286,10 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
             {simulados.map(simulado => (
               <Box key={simulado.id} bg="white" p={4} borderRadius="lg" boxShadow="md" color="gray.800">
                 <VStack spacing={3} align="center">
-                  <Image src={simulado.image} alt={simulado.title} boxSize="150px" objectFit="contain" mb={2} />
+                  {/* Removido: <Image src={simulado.image} alt={simulado.title} boxSize="150px" objectFit="contain" mb={2} /> */}
                   <Heading size="md" textAlign="center">{simulado.title}</Heading>
                   <VStack align="flex-start" spacing={1} fontSize="sm">
-                    <Text>• Prova {simulado.title.includes('Enem') ? simulado.title.split(' ')[2] : ''}</Text> {/* Adapta para ENEM */}
+                    <Text>• Prova {simulado.title.includes('Enem') ? simulado.title.split(' ')[2] : ''}</Text>
                     <Text>• {simulado.subject}</Text>
                     <Text>• {simulado.duration}</Text>
                     <Text>• Instituição: {simulado.institution}</Text>
@@ -238,7 +299,7 @@ function SimuladoSelectionPage({ onStartSimulado, onShowHistory, onLogout }) {
                     colorScheme="blue"
                     mt={4}
                     width="full"
-                    onClick={() => onStartSimulado(simulado.title, simulado.timeInMinutes, simulado.id)} // Adiciona simulado.id
+                    onClick={() => onStartSimulado(simulado.title, simulado.timeInMinutes, simulado.id)}
                   >
                     INICIAR
                   </Button>

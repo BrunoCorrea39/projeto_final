@@ -16,7 +16,7 @@ import {
   Alert, AlertIcon, // Adicione Alert
   useToast,
 } from '@chakra-ui/react';
-import { fetchQuestionsForSimulado, submitSimuladoAnswers } from '../api/mockapi'; // Importe as funções da API Mock
+import { fetchQuestionsForSimulado, submitSimuladoAnswers } from '../api/mockApi';
 
 // --- Custom Hook para Cronômetro (o mesmo que já está aí) ---
 function useCountdown(initialTimeInMinutes, onComplete) {

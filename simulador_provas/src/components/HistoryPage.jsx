@@ -1,5 +1,3 @@
-// src/HistoryPage.jsx
-
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -10,15 +8,43 @@ import {
   Heading,
   Button,
   Divider,
-  SimpleGrid, // Para talvez usar no layout dos itens do histórico
+  SimpleGrid,
 } from '@chakra-ui/react';
+// import axios from 'axios'; // Importe se for usar API real para histórico
 
-// Este componente recebe uma função para retornar ao menu principal
+// URL da API para histórico (Ainda mockada, aguardando API real)
+// const HISTORY_API_URL = 'http://127.0.0.1:8000/historico'; // Exemplo de URL real
+
 function HistoryPage({ onGoBack }) {
   const [history, setHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(false); // Para futuro loading da API real
+  const [error, setError] = useState(null); // Para futuro erro da API real
 
   useEffect(() => {
-    // Carrega o histórico do localStorage ao montar o componente
+    // Por enquanto, carrega do localStorage. Quando a API real estiver pronta, use axios.get
+    // const loadHistory = async () => {
+    //   setIsLoading(true);
+    //   setError(null);
+    //   try {
+    //     const userToken = localStorage.getItem('userToken');
+    //     const response = await axios.get(HISTORY_API_URL, {
+    //       headers: { 'Authorization': userToken }
+    //     });
+    //     // Adapte a resposta da API (ex: response.data para setHistory)
+    //     setHistory(response.data.reverse());
+    //   } catch (err) {
+    //     setError("Erro ao carregar histórico da API.");
+    //   } finally {
+    //     setIsLoading(false);
+    //   }
+    // };
+    // if (localStorage.getItem('userToken')) {
+    //   loadHistory();
+    // } else {
+    //   setError("Faça login para ver seu histórico.");
+    //   setIsLoading(false);
+    // }
+
     const storedHistory = JSON.parse(localStorage.getItem('simuladoHistory') || '[]');
     setHistory(storedHistory.reverse()); // Exibe os mais recentes primeiro
   }, []);
@@ -27,7 +53,7 @@ function HistoryPage({ onGoBack }) {
     if (window.confirm("Você tem certeza que deseja limpar todo o histórico?")) {
       localStorage.removeItem('simuladoHistory');
       setHistory([]);
-      // Exibir um toast de sucesso
+      // Se fosse API real, você faria uma chamada DELETE aqui
     }
   };
 
@@ -38,7 +64,7 @@ function HistoryPage({ onGoBack }) {
     let parts = [];
     if (hours > 0) parts.push(`${hours}h`);
     if (minutes > 0) parts.push(`${minutes}min`);
-    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`); // Inclui segundos se for 0 ou se for o único
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
     return parts.join(' ');
   };
 
@@ -68,7 +94,16 @@ function HistoryPage({ onGoBack }) {
       <Box flex="1" p={8} bg="blue.800" color="white" overflowY="auto">
         <Heading as="h1" size="xl" mb={8} textAlign="center">Histórico de Simulados</Heading>
 
-        {history.length === 0 ? (
+        {isLoading ? (
+          <Flex justify="center" align="center" minH="200px">
+            <Spinner size="xl" color="white" />
+          </Flex>
+        ) : error ? (
+          <Alert status="error">
+            <AlertIcon />
+            {error}
+          </Alert>
+        ) : history.length === 0 ? (
           <Flex justify="center" align="center" minH="200px">
             <Text fontSize="lg" color="whiteAlpha.700">Nenhum simulado realizado ainda.</Text>
           </Flex>

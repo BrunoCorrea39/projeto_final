@@ -126,32 +126,17 @@ const mockQuestionsData = [
   },
 ];
 
-// Função que simula um atraso de rede
 const simulateDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// --- Funções da API Mock ---
+// Função de Login Removida (Agora usa a API real no LoginPage.jsx)
+// export const loginUser = async (username, password) => { ... };
 
-// 1. Simula o login de usuário
-export const loginUser = async (username, password) => {
-  await simulateDelay(500); // Simula 0.5 segundo de atraso de rede
-
-  if (username === "teste" && password === "123") { // Credenciais fixas para teste
-    return { success: true, message: "Login bem-sucedido!", token: "fake-jwt-token" };
-  } else if (username === "professor" && password === "prof123") {
-    return { success: true, message: "Login de professor bem-sucedido!", token: "fake-prof-token", role: "teacher" };
-  }
-  else {
-    return { success: false, message: "Nome de usuário ou senha inválidos." };
-  }
-};
-
-// 2. Simula a obtenção da lista de simulados
+// Simula a obtenção da lista de simulados (MANTIDA POR ENQUANTO)
 export const fetchSimulados = async (filters = {}) => {
-  await simulateDelay(700); // Simula 0.7 segundo de atraso
+  await simulateDelay(700);
 
   let filtered = [...mockSimuladosData];
 
-  // Aplica filtros (se fornecidos)
   if (filters.searchTerm) {
     const term = filters.searchTerm.toLowerCase();
     filtered = filtered.filter(s =>
@@ -173,12 +158,10 @@ export const fetchSimulados = async (filters = {}) => {
   return { success: true, data: filtered };
 };
 
-// 3. Simula a obtenção das questões para um simulado específico
+// Simula a obtenção das questões para um simulado específico (MANTIDA POR ENQUANTO)
 export const fetchQuestionsForSimulado = async (simuladoId) => {
-  await simulateDelay(600); // Simula 0.6 segundo de atraso
+  await simulateDelay(600);
 
-  // Para o mock, retornamos sempre as mesmas 5 questões, independente do simuladoId.
-  // Em uma API real, você buscaria questões específicas para o simuladoId.
   const simulado = mockSimuladosData.find(s => s.id === simuladoId);
 
   if (simulado) {
@@ -188,11 +171,11 @@ export const fetchQuestionsForSimulado = async (simuladoId) => {
   }
 };
 
-// 4. Simula o envio das respostas do usuário e correção
+// Simula o envio das respostas do usuário e correção (MANTIDA POR ENQUANTO)
 export const submitSimuladoAnswers = async (simuladoId, answers) => {
-  await simulateDelay(1000); // Simula 1 segundo de atraso
+  await simulateDelay(1000);
 
-  const questions = mockQuestionsData; // Usamos as mockadas para correção
+  const questions = mockQuestionsData;
 
   let correctCount = 0;
   questions.forEach(q => {
@@ -214,5 +197,3 @@ export const submitSimuladoAnswers = async (simuladoId, answers) => {
     }
   };
 };
-
-// Futuramente: Simular fetchHistory, submitNewUser, etc.
